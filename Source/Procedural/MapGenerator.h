@@ -15,7 +15,8 @@ public:
 	void TimerEnd();
 	// Sets default values for this actor's properties
 	AMapGenerator();
-	void GenerateMap(int x, int y, int z, const FVector location, const FRotator rotation, const Tile::Direction d, bool stairs, int depth);
+	void generateMap(int x, int y, int z, const FVector location, const FRotator rotation, const Tile::Direction d, bool stairs, int depth);
+	void generateSecretDoors();
 	int getMapIndex1D(const int x, const int y, const int z) const;
 	bool checkTilePatchEmpty(const int x, const int y, const int z, const int patchSize, bool xRand, bool yRand);
 	void traverse(Tile::Direction dir, int x, int y, int z, FVector location, FRotator rotation, int depth);
@@ -39,7 +40,11 @@ protected:
 	UPROPERTY(EditAnywhere)
 		TSubclassOf<AActor> wallClass;
 	UPROPERTY(EditAnywhere)
-		TSubclassOf<AActor> wallDoorClass;	
+		TSubclassOf<AActor> wallDoorClass;		
+	UPROPERTY(EditAnywhere)
+		TSubclassOf<AActor> secretDoorClass;	
+	UPROPERTY(EditAnywhere)
+		int maxNumberOfSecretDoors = 3;
 	UPROPERTY(EditAnywhere)
 		TSubclassOf<AActor> stairClass;
 	UPROPERTY(EditAnywhere)
@@ -48,6 +53,8 @@ protected:
 		bool generateRoof = true;	
 	UPROPERTY(EditAnywhere)
 		bool traverseVertically = true;
+
+
 	TMap<int, Tile*> tileMap;
 	TArray<Room*> roomList;
 public:	

@@ -17,24 +17,64 @@ void AMapGenerator::BeginPlay()
 {
 	Super::BeginPlay();
 
-	GenerateMap(sizeX/2, sizeY/2, 0, GetActorLocation(), GetActorRotation(), Tile::Direction::NO_DIRECTION, false, 0);
+	generateMap(sizeX/2, sizeY/2, 0, GetActorLocation(), GetActorRotation(), Tile::Direction::NO_DIRECTION, false, 0);
 	if (GEngine) {
 		GEngine->AddOnScreenDebugMessage(-1, 50.f, FColor::Yellow, FString::Printf(TEXT("Number of Rooms: %d"), roomList.Num()));
 	}
 	for (auto r : roomList) {
 		if (r) {
-			FLinearColor color = FLinearColor(FMath::RandRange(0.0f, 1.0f), FMath::RandRange(0.0f, 1.0f), FMath::RandRange(0.0f, 1.0f));
-			r->setColor(color);
+			FLinearColor color;// = FLinearColor(FMath::RandRange(0.0f, 1.0f), FMath::RandRange(0.0f, 1.0f), FMath::RandRange(0.0f, 1.0f));
 			//int rc = r->printRoomConnections();
+			//switch (rc) {
+			//case 0: { //should not happen
+			//	color = FLinearColor(0.0, 0.0, 0.0);
+			//	break;
+			//}
+			//case 1: {
+			//	color = FLinearColor(.1, .1, .1);
+			//	break;
+			//}
+			//case 2: {
+			//	color = FLinearColor(.3, .3, .3);
+			//	break;
+			//}
+			//case 3: {
+			//	color = FLinearColor(.5, .5, .5);
+			//	break;
+			//}
+			//case 4: {
+			//	color = FLinearColor(.7, .7, .7);
+			//	break;
+			//}
+			//default: {
+			//	color = FLinearColor(1.0, 1.0, 1.0);
+			//	break;
+			//}
+			//}
+			//r->setColor(color);
+			r->setColor(FLinearColor(FMath::RandRange(0.0f, 1.0f), FMath::RandRange(0.0f, 1.0f), FMath::RandRange(0.0f, 1.0f)));
+			//GEngine->AddOnScreenDebugMessage(-1, 50.f, FColor::White, FString::Printf(TEXT("Number of Rooms: %d"), rc));
 			
 		}
 	}
+
+	generateSecretDoors();
+
+
 }
 int AMapGenerator::getMapIndex1D(const int x, const int y, const int z) const{
 	//return sizeX * x + y;
 	return x + sizeX * (y + sizeZ * z);
 }
-void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, const FRotator rotation, const Tile::Direction d, bool stairs, int depth) {
+//FVector AMapGenerator::getMapIndex3D(const int i) const {
+//	int x = i - sizeX * (y + sizeZ * z);
+//	int y = ((i - x) / sizeX) - (sizeZ * z);
+//	int z = (((i - x) / sizeX) - y) / sizeZ;
+//
+//
+//	return FVector{x,y,z};
+//}
+void AMapGenerator::generateMap(int x, int y, int z, const FVector location, const FRotator rotation, const Tile::Direction d, bool stairs, int depth) {
 	//GetWorld()->GetTimerManager().SetTimer(UnusedHandle, this, &AMapGenerator::TimerEnd, 3.f, false);
 
 	
@@ -79,10 +119,6 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 		CHECK* Stairs in direction of tile before, whole tile is a stairs
 		CHECK* Next tile MUST be in same direction as stairs to continue
 		CHECK* Mark tiles above/below stairs as occupied tiles but no floor
-	- Secret/Shortcuts doors
-		* After map is generated, pick a number of rooms and get some tiles with a wall attached.
-		* Check the tiles room and its connection to neighboring room 
-		* If not connected: Add secret door
 	- Roofs, Lights, Windows, Start, End, 3rd-person movement
 		* Option toggle
 	*/
@@ -92,8 +128,10 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 	//Floor and Roof
 	FVector roofLocation = location;
 	roofLocation.Z += tileHeight - 50;
+
 	Tile* baseTile = new Tile();
-	baseTile->setIndex(getMapIndex1D(x, y, z), 0, 0);
+	baseTile->setIndex(getMapIndex1D(x, y, z), 0, 0, FVector(x,y,z));
+	baseTile->setLocation(location);
 	if (!stairs) {
 		AActor* baseFloor = GetWorld()->SpawnActor<AActor>(floorClass, location, rotation);
 		baseTile->addFloor(baseFloor);
@@ -129,7 +167,8 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 					}
 
 					tile->addFloor(floor);
-					tile->setIndex(getMapIndex1D(x + ii, y + jj, z), ii, jj);
+					tile->setIndex(getMapIndex1D(x + ii, y + jj, z), ii, jj, FVector(x + ii, y + jj, z));
+					tile->setLocation(tileLocation);
 					tilesToSpawn.Add(tile);
 					
 					if (exitDir && jj == (patchSize - 1) * FMath::Sign(jj) && ii == FMath::DivideAndRoundDown((patchSize - 1) * FMath::Sign(ii), 2)) {
@@ -195,8 +234,8 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 
 			if (!tileMap.Contains(getMapIndex1D(x + stepX, y + stepY, z))) {
 				//Add wall when no adjacent tile exists
-				AActor* east = GetWorld()->SpawnActor<AActor>(wallClass, wallLocation, sideRotation);
-				tilesToSpawn[tileIndex]->addWall(east, Tile::WallType::WALL, static_cast<Tile::Direction>(i));
+				AActor* wall = GetWorld()->SpawnActor<AActor>(wallClass, wallLocation, sideRotation);
+				tilesToSpawn[tileIndex]->addWall(wall, Tile::WallType::WALL, static_cast<Tile::Direction>(i));
 			}
 			else {
 				Tile* foundTile = *tileMap.Find(getMapIndex1D(x + stepX, y + stepY, z));
@@ -206,14 +245,15 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 						foundTile->deleteWall(Tile::getOppositeDirection(static_cast<Tile::Direction>(i)));
 						if (d != Tile::getOppositeDirection(static_cast<Tile::Direction>(i))) {
 							//Add walls at all directions except behind the tile
-							AActor* south = GetWorld()->SpawnActor<AActor>(wallClass, wallLocation, sideRotation);
-							tilesToSpawn[tileIndex]->addWall(south, Tile::WallType::WALL, static_cast<Tile::Direction>(i));
+							AActor* wall = GetWorld()->SpawnActor<AActor>(wallClass, wallLocation, sideRotation);
+							tilesToSpawn[tileIndex]->addWall(wall, Tile::WallType::WALL, static_cast<Tile::Direction>(i));
 						}
 						else if (FMath::RandRange(0, 3) == 0) {
 							//Close room behind and add a door to it
-							AActor* south = GetWorld()->SpawnActor<AActor>(wallDoorClass, wallLocation, sideRotation);
-							tilesToSpawn[tileIndex]->addWall(south, Tile::WallType::DOOR, static_cast<Tile::Direction>(i));
+							AActor* door = GetWorld()->SpawnActor<AActor>(wallDoorClass, wallLocation, sideRotation);
+							tilesToSpawn[tileIndex]->addWall(door, Tile::WallType::DOOR, static_cast<Tile::Direction>(i));
 							room->addRoomConnection(otherRoom);
+							otherRoom->addRoomConnection(room);
 						}
 						else {
 							//Wall is removed without replacement
@@ -226,8 +266,8 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 							foundTile->deleteWall(Tile::getOppositeDirection(static_cast<Tile::Direction>(i)));
 
 							//Close room behind and add a door to it
-							AActor* south = GetWorld()->SpawnActor<AActor>(wallDoorClass, wallLocation, sideRotation);
-							tilesToSpawn[tileIndex]->addWall(south, Tile::WallType::DOOR, static_cast<Tile::Direction>(i));
+							AActor* door = GetWorld()->SpawnActor<AActor>(wallDoorClass, wallLocation, sideRotation);
+							tilesToSpawn[tileIndex]->addWall(door, Tile::WallType::DOOR, static_cast<Tile::Direction>(i));
 							room->addRoomConnection(otherRoom);
 							
 						}
@@ -270,6 +310,7 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 	}
 
 	roomList.Add(room);
+
 #define TRAVERSE
 #ifdef TRAVERSE
 	float timeDelay = 1.0f;
@@ -285,7 +326,7 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 	if (stairUp) {
 		FVector newLocation = location;
 		newLocation.Z += tileHeight;
-		GenerateMap(x, y, z + 1, newLocation, rotation, d, true, depth - 1);
+		generateMap(x, y, z + 1, newLocation, rotation, d, true, depth - 1);
 		
 	}
 	else if (stairs) {
@@ -316,7 +357,7 @@ void AMapGenerator::traverse(Tile::Direction dir, int x, int y, int z, FVector l
 			FVector newLocation = location;
 			if (!tileMap.Contains(getMapIndex1D(x + 1, y, z))) {
 				newLocation.X += tileSize;
-				GenerateMap(x + 1, y, z, newLocation, rotation, Tile::Direction::EAST, false, depth + 1);
+				generateMap(x + 1, y, z, newLocation, rotation, Tile::Direction::EAST, false, depth + 1);
 			}
 			break;
 		}
@@ -325,7 +366,7 @@ void AMapGenerator::traverse(Tile::Direction dir, int x, int y, int z, FVector l
 			FVector newLocation = location;
 			if (!tileMap.Contains(getMapIndex1D(x - 1, y, z))) {
 				newLocation.X -= tileSize;
-				GenerateMap(x - 1, y, z, newLocation, rotation, Tile::Direction::WEST, false, depth + 1);
+				generateMap(x - 1, y, z, newLocation, rotation, Tile::Direction::WEST, false, depth + 1);
 			}
 			break;
 		}
@@ -334,7 +375,7 @@ void AMapGenerator::traverse(Tile::Direction dir, int x, int y, int z, FVector l
 			FVector newLocation = location;
 			if (!tileMap.Contains(getMapIndex1D(x, y + 1, z)) ) {
 				newLocation.Y += tileSize;
-				GenerateMap(x, y + 1, z, newLocation, rotation, Tile::Direction::NORTH, false, depth + 1);
+				generateMap(x, y + 1, z, newLocation, rotation, Tile::Direction::NORTH, false, depth + 1);
 			}
 			break;
 		}
@@ -343,11 +384,99 @@ void AMapGenerator::traverse(Tile::Direction dir, int x, int y, int z, FVector l
 			FVector newLocation = location;
 			if (!tileMap.Contains(getMapIndex1D(x, y - 1, z))) {
 				newLocation.Y -= tileSize;
-				GenerateMap(x, y - 1, z, newLocation, rotation, Tile::Direction::SOUTH, false, depth + 1);
+				generateMap(x, y - 1, z, newLocation, rotation, Tile::Direction::SOUTH, false, depth + 1);
 			}
 			break;
 		}
 	}
+
+}
+void AMapGenerator::generateSecretDoors() {
+	/*if (GEngine) {
+		GEngine->AddOnScreenDebugMessage(-1, 50.f, FColor::Yellow, FString::Printf(TEXT("Number of Rooms: %d"), roomList.Num()));
+	}*/
+	/*
+	- Secret/Shortcuts doors
+	* Pick a number of rooms and get some tiles with a wall attached.
+	* Check the tiles room and its connection to neighboring room.
+	* If not connected: Add secret door -> Connect rooms
+	*/
+	int totalNumSecretDoorsSpawned = 0;
+	TArray<Room*> roomsWithPotentialSecretDoors;
+	for (int i = 0; i < FMath::Min(maxNumberOfSecretDoors, roomList.Num()-1); i++)
+	{
+		roomsWithPotentialSecretDoors.AddUnique(roomList[FMath::RandRange(0, roomList.Num() - 1)]);
+	}
+	for (auto& room : roomsWithPotentialSecretDoors)
+	{
+		TArray<Tile*> tileList = room->getTiles();
+		for (auto& tile : tileList)
+		{
+			/*
+				- get wall direction
+				- check if tile in that direction exists && that room is not already connected
+					- if not connected -> delete wall of tile and add secret door
+					- then add connection between the rooms
+					- break loop
+				- else -> continue for loop until found suitable tile or end of room tiles
+
+			*/
+			int stepX = 0, stepY = 0;
+			Tile::Direction wallDir = tile->getWallDirection();
+
+			if (wallDir != Tile::Direction::NO_DIRECTION) {
+				FVector doorLocation = tile->getLocation();
+				FRotator doorRotation(0,0,0);
+				switch (wallDir) {
+					case Tile::Direction::EAST: {
+						doorLocation.X += tileSize / 2;
+						doorRotation.Add(0, 90.0f, 0);
+						stepX += 1;
+						break;
+					}
+					case Tile::Direction::WEST: {
+						doorLocation.X -= tileSize / 2;
+						doorRotation.Add(0, 90.0f, 0);
+						stepX += -1;
+						break;
+					}
+					case Tile::Direction::NORTH: {
+						doorLocation.Y += tileSize / 2;
+						stepY += 1;
+						break;
+					}
+					case Tile::Direction::SOUTH: {
+						doorLocation.Y -= tileSize / 2;
+						stepY += -1;
+						break;
+					}
+				}
+				FVector tileCoords = tile->getCoords();
+				if (tileMap.Contains(getMapIndex1D(tileCoords.X + stepX, tileCoords.Y + stepY, tileCoords.Z))) {
+				
+					Tile* foundTile = *tileMap.Find(getMapIndex1D(tileCoords.X + stepX, tileCoords.Y + stepY, tileCoords.Z));
+					Room* otherRoom = foundTile->getRoom();
+					
+					if (!tile->hasStairs() && !foundTile->hasStairs() && room != otherRoom && !room->roomsAreConnected(otherRoom)) {
+						
+						//Create Secret Door!
+						tile->deleteWall(wallDir);
+						AActor* secretDoor = GetWorld()->SpawnActor<AActor>(secretDoorClass, doorLocation, doorRotation);
+						totalNumSecretDoorsSpawned++;
+
+						room->addRoomConnection(otherRoom);
+						otherRoom->addRoomConnection(room);
+						break;
+					}
+				}
+			}
+		}
+	}
+	if (GEngine) {
+		GEngine->AddOnScreenDebugMessage(-1, 50.f, FColor::Yellow, FString::Printf(TEXT("Total number of secret doors spawned: %d"), totalNumSecretDoorsSpawned));
+	}
+
+
 
 }
 void AMapGenerator::TimerEnd() {

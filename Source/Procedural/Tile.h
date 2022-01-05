@@ -39,8 +39,8 @@ public:
 		}
 	}
 	struct Wall {
-		Wall(AActor* a, WallType t)
-			:actor{a}, type{t}{}
+		/*Wall(AActor* a, WallType t)
+			:actor{a}, type{t}{}*/
 		Wall() { dummy = true; };
 		AActor* actor;
 		WallType type;
@@ -51,36 +51,47 @@ public:
 	~Tile();
 	void setRoom(Room* r) { room = r; }
 	Room* getRoom() { return room; }
-	//add and remove south/north/east/west door/wall
 	void addWall(AActor* a, WallType type, Direction d) {
-		if(d == Direction::WEST)
-			west = new Wall(a, type);
-		else if (d == Direction::EAST)
-			east = new Wall(a, type);
-		else if (d == Direction::NORTH)
-			north = new Wall(a, type);
-		else if (d == Direction::SOUTH)
-			south = new Wall(a, type);
+		if (d == Direction::WEST) {
+			west->actor = a;
+			west->type = type;
+			west->dummy = false;
+		}
+		else if (d == Direction::EAST) {
+			east->actor = a;
+			east->type = type;
+			east->dummy = false;
+		}
+		else if (d == Direction::NORTH) {
+			north->actor = a;
+			north->type = type;
+			north->dummy = false;
+		}
+		else if (d == Direction::SOUTH) {
+			south->actor = a;
+			south->type = type;
+			south->dummy = false;
+		}
 	}
 	void addFloor(AActor* a) { floor = a; }
 	void addStairs(AActor* a) { stairs = a; }
 	bool hasStairs() { return IsValid(stairs); }
 	void deleteWall(Direction d) {
-		if (d == WEST && west && !west->dummy && west->actor && !west->actor->IsPendingKill()) {
+		if (d == WEST && !west->dummy && west->actor && !west->actor->IsPendingKill()) {
 			west->actor->Destroy();
-			//west->actor = nullptr;
+			west->dummy = true;
 		}
-		else if (d == EAST && east && !east->dummy && east->actor && !east->actor->IsPendingKill()) {
+		else if (d == EAST && !east->dummy && east->actor && !east->actor->IsPendingKill()) {
 			east->actor->Destroy();
-			//east->actor = nullptr;
+			east->dummy = true;
 		}
-		else if (d == NORTH && west && !north->dummy && north->actor && !north->actor->IsPendingKill()) {
+		else if (d == NORTH && !north->dummy && north->actor && !north->actor->IsPendingKill()) {
 			north->actor->Destroy();
-			//north->actor = nullptr;
+			north->dummy = true;
 		}
-		else if (d == SOUTH && south && !south->dummy && south->actor && !south->actor->IsPendingKill()) {
+		else if (d == SOUTH  && !south->dummy && south->actor && !south->actor->IsPendingKill()) {
 			south->actor->Destroy();
-			//south->actor = nullptr;
+			south->dummy = true;
 		}
 	}
 	void deleteFloor(){
@@ -90,17 +101,27 @@ public:
 		}
 	}	
 	bool tileHasDoor() {
-		return false;
 		return  (east && east->type == WallType::DOOR) ||
 			(west && west->type == WallType::DOOR) ||
 			(north && north->type == WallType::DOOR) ||
 			(south && south->type == WallType::DOOR);
 	}
-	bool tileHasOpening() {
-		return  !((east && east->actor ) &&
-				(west && west->actor) &&
-				(north && north->actor) &&
-				(south && south->actor));
+	Direction getWallDirection() {
+		if ((!east->dummy && east->type == WallType::WALL)) {
+			return Direction::EAST;
+		}
+		else if ((!west->dummy && west->type == WallType::WALL)) {
+			return Direction::WEST;
+		}
+		else if ((!north->dummy && north->type == WallType::WALL)) {
+			return Direction::NORTH;
+		}
+		else if ((!south->dummy && south->type == WallType::WALL)) {
+			return Direction::SOUTH;
+		}
+		else {
+			return Direction::NO_DIRECTION;
+		}
 	}
 	void setFloorColor(FLinearColor c) {
 		if (floor) {
@@ -109,15 +130,19 @@ public:
 			auto dynamicMaterial = UMaterialInstanceDynamic::Create(material, NULL);
 			mesh->SetMaterial(0, dynamicMaterial);
 			dynamicMaterial->SetVectorParameterValue(TEXT("Color"), c);
-
 		}
 	}
-	void setIndex(int i, int _x, int _y) { 
+	void setIndex(int i, int _x, int _y, FVector _coords) { 
 		index = i;
 		offsetX = _x;
 		offsetY = _y;
+		coords = _coords;
 	}
+	void setLocation(FVector loc) { location = loc; }
+	FVector getLocation() { return location; }
+
 	int getIndex() { return index; }
+	FVector getCoords() { return coords; }
 	int getOffsetX() { return offsetX; }
 	int getOffsetY() { return offsetY; }
 protected:
@@ -132,6 +157,8 @@ protected:
 	AActor* stairs;
 
 	int index;
+	FVector coords;
+	FVector location;
 	int offsetX;
 	int offsetY;
 };
