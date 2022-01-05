@@ -53,10 +53,10 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 	bool wallNorth = FMath::RandRange(0, 1) == 0;
 	bool wallSouth = FMath::RandRange(0, 1) == 0;
 
-	bool closeBehindEast = FMath::RandRange(0, 1) == 0;
-	bool closeBehindWest = FMath::RandRange(0, 1) == 0;
-	bool closeBehindNorth = FMath::RandRange(0, 1) == 0;
-	bool closeBehindSouth = FMath::RandRange(0, 1) == 0;
+	//bool closeBehindEast = FMath::RandRange(0, 1) == 0;
+	//bool closeBehindWest = FMath::RandRange(0, 1) == 0;
+	//bool closeBehindNorth = FMath::RandRange(0, 1) == 0;
+	//bool closeBehindSouth = FMath::RandRange(0, 1) == 0;
 
 
 
@@ -89,10 +89,9 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 	TArray<Tile*> tilesToSpawn;
 	int patchSize = 1;
 	int patchExitOffsetX = 0, patchExitOffsetY = 0;
-	//Floor
-
-
-	
+	//Floor and Roof
+	FVector roofLocation = location;
+	roofLocation.Z += tileHeight - 50;
 	Tile* baseTile = new Tile();
 	baseTile->setIndex(getMapIndex1D(x, y, z), 0, 0);
 	if (!stairs) {
@@ -100,6 +99,8 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 		baseTile->addFloor(baseFloor);
 		if (FMath::RandRange(0, 3) == 0) {
 			patchSize = FMath::RandRange(2, 5);
+			if(generateRoof)
+				AActor* baseRoof = GetWorld()->SpawnActor<AActor>(roofClass, roofLocation, rotation);
 		}
 	}
 	tilesToSpawn.Add(baseTile);
@@ -121,6 +122,12 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 					tileLocation.X += ii * tileSize;
 					tileLocation.Y += jj * tileSize;
 					AActor* floor = GetWorld()->SpawnActor<AActor>(floorClass, tileLocation, rotation);
+					if (generateRoof) {
+						roofLocation.X = tileLocation.X;
+						roofLocation.Y = tileLocation.Y;
+						AActor* roof = GetWorld()->SpawnActor<AActor>(roofClass, roofLocation, rotation);
+					}
+
 					tile->addFloor(floor);
 					tile->setIndex(getMapIndex1D(x + ii, y + jj, z), ii, jj);
 					tilesToSpawn.Add(tile);
@@ -217,10 +224,12 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 					else if (tilesToSpawn.Num() > 1 && tileIndex == 0) {
 						if (d == Tile::getOppositeDirection(static_cast<Tile::Direction>(i))) {
 							foundTile->deleteWall(Tile::getOppositeDirection(static_cast<Tile::Direction>(i)));
+
 							//Close room behind and add a door to it
 							AActor* south = GetWorld()->SpawnActor<AActor>(wallDoorClass, wallLocation, sideRotation);
 							tilesToSpawn[tileIndex]->addWall(south, Tile::WallType::DOOR, static_cast<Tile::Direction>(i));
 							room->addRoomConnection(otherRoom);
+							
 						}
 					}
 					
@@ -231,7 +240,7 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 	}
 
 	//Stairs
-	bool stairUp = !stairs && FMath::RandRange(0, 5) == 0 && patchSize == 1 && !tileMap.Contains(getMapIndex1D(x, y, z + 1));
+	bool stairUp = traverseVertically && !stairs && FMath::RandRange(0, 5) == 0 && patchSize == 1 && !tileMap.Contains(getMapIndex1D(x, y, z + 1)) && depth != 0;
 	if (stairUp) {
 		FRotator stairRotation = rotation;
 		switch (d) {
@@ -255,6 +264,10 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 		tileMap[getMapIndex1D(x, y, z)]->addStairs(stairs);
 		
 	}
+	else{
+		if (generateRoof)
+			AActor* baseRoof = GetWorld()->SpawnActor<AActor>(roofClass, roofLocation, rotation);
+	}
 
 	roomList.Add(room);
 #define TRAVERSE
@@ -267,32 +280,19 @@ void AMapGenerator::GenerateMap(int x, int y, int z, const FVector location, con
 	offsetPatchLocation.X += patchExitOffsetX * tileSize;
 	offsetPatchLocation.Y += patchExitOffsetY * tileSize;
 
-	//FTimerHandle TimerHandle;
 	//TODO: Reason for shape of map forming along line -> traverse in random order to avoid this
 	//Traverse in 4 directions randomly
-	if (stairUp && !tileMap.Contains(getMapIndex1D(x, y, z + 1)) && depth != 0) {
+	if (stairUp) {
 		FVector newLocation = location;
 		newLocation.Z += tileHeight;
-		GenerateMap(x, y, z + 1, newLocation, rotation, d, true, depth-1);
+		GenerateMap(x, y, z + 1, newLocation, rotation, d, true, depth - 1);
 		
 	}
 	else if (stairs) {
-		//traverse in direction -d
 		traverse(d, x, y, z, location, rotation, depth);
 	}
 	else {
 		if (traverseEast) {
-			////East
-			//FVector newLocation = offsetPatchLocation;
-			//if (!tileMap.Contains(getMapIndex1D(x + 1, y, z))) {
-			//	newLocation.X += tileSize;
-			//	//FTimerDelegate TimerDel;
-			//	//Binding the function with specific values
-			//	//FTimerDelegate TimerDel = FTimerDelegate::CreateUObject(this, &AMapGenerator::GenerateMap, x + 1, y, newLocation, rotation, Tile::Direction::EAST, depth + 1);
-			//	//GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDel, timeDelay, true);
-			//	GenerateMap(x + 1, y, z, newLocation, rotation, Tile::Direction::EAST, false, depth + 1);
-
-			//}
 			traverse(Tile::Direction::EAST, x, y, z, offsetPatchLocation, rotation, depth);
 		}
 		if (traverseNorth) {

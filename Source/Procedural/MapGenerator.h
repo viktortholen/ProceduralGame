@@ -35,6 +35,8 @@ protected:
 	UPROPERTY(EditAnywhere)
 		TSubclassOf<AActor> floorClass;
 	UPROPERTY(EditAnywhere)
+		TSubclassOf<AActor> roofClass;
+	UPROPERTY(EditAnywhere)
 		TSubclassOf<AActor> wallClass;
 	UPROPERTY(EditAnywhere)
 		TSubclassOf<AActor> wallDoorClass;	
@@ -42,7 +44,10 @@ protected:
 		TSubclassOf<AActor> stairClass;
 	UPROPERTY(EditAnywhere)
 		int recursiveDepth = 10;
-
+	UPROPERTY(EditAnywhere)
+		bool generateRoof = true;	
+	UPROPERTY(EditAnywhere)
+		bool traverseVertically = true;
 	TMap<int, Tile*> tileMap;
 	TArray<Room*> roomList;
 public:	
