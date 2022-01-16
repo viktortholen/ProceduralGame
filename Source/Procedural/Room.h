@@ -16,7 +16,7 @@ public:
 
 	void addTile(Tile* tile);
 	void addRoomConnection(Room* roomToConnect) {
-		connectedRooms.Add(roomToConnect);
+		connectedRooms.AddUnique(roomToConnect);
 	}
 	TArray<Room*> getConnectedRooms() {
 		return connectedRooms;
@@ -27,6 +27,9 @@ public:
 	TArray<Tile*> getTiles() { return tileList; }
 
 	bool roomsAreConnected(Room* roomToCheck) {
+		if (roomToCheck == this) {
+			return true;
+		}
 		return connectedRooms.Contains(roomToCheck);
 	}
 	void setColor(FLinearColor c) {

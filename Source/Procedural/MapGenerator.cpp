@@ -17,36 +17,40 @@ void AMapGenerator::BeginPlay()
 {
 	Super::BeginPlay();
 
+	FDateTime startTime = FDateTime::UtcNow();
+	int32 startMs = startTime.GetMillisecond();
+	int64 unixStart = startTime.ToUnixTimestamp() * 1000 + startMs;
+
 	generateMap(sizeX/2, sizeY/2, 0, GetActorLocation(), GetActorRotation(), Tile::Direction::NO_DIRECTION, false, 0);
-	if (GEngine) {
-		GEngine->AddOnScreenDebugMessage(-1, 50.f, FColor::Yellow, FString::Printf(TEXT("Number of Rooms: %d"), roomList.Num()));
-	}
+	
+	GEngine->AddOnScreenDebugMessage(-1, 50.f, FColor::Yellow, FString::Printf(TEXT("Number of Rooms: %d"), roomList.Num()));
+	generateSecretDoors();
 	for (auto r : roomList) {
 		if (r) {
-			FLinearColor color;// = FLinearColor(FMath::RandRange(0.0f, 1.0f), FMath::RandRange(0.0f, 1.0f), FMath::RandRange(0.0f, 1.0f));
+			FLinearColor color;// = FLinearColor(.1, .1, .1);
 			//int rc = r->printRoomConnections();
 			//switch (rc) {
 			//case 0: { //should not happen
 			//	color = FLinearColor(0.0, 0.0, 0.0);
 			//	break;
 			//}
-			//case 1: {
-			//	color = FLinearColor(.1, .1, .1);
+			//case 1: { //red
+			//	color = FLinearColor(1, .1, .1);
 			//	break;
 			//}
-			//case 2: {
-			//	color = FLinearColor(.3, .3, .3);
+			//case 2: { //green
+			//	color = FLinearColor(.3, 1, .3);
 			//	break;
 			//}
-			//case 3: {
-			//	color = FLinearColor(.5, .5, .5);
+			//case 3: {//blue
+			//	color = FLinearColor(.5, .5, 1);
 			//	break;
 			//}
-			//case 4: {
-			//	color = FLinearColor(.7, .7, .7);
+			//case 4: { //yellow
+			//	color = FLinearColor(1, 1, 0);
 			//	break;
 			//}
-			//default: {
+			//default: { //white
 			//	color = FLinearColor(1.0, 1.0, 1.0);
 			//	break;
 			//}
@@ -58,22 +62,20 @@ void AMapGenerator::BeginPlay()
 		}
 	}
 
-	generateSecretDoors();
 
+
+	GEngine->AddOnScreenDebugMessage(-1, 50.f, FColor::Red, FString::Printf(TEXT("Number of Tiles: %d"), tileMap.Num()));
+
+	FDateTime endTime = FDateTime::UtcNow();
+	int32 endMs = endTime.GetMillisecond();
+	int64 unixEnd = endTime.ToUnixTimestamp() * 1000 + endMs;
+	GEngine->AddOnScreenDebugMessage(-1, 50.f, FColor::Red, FString::Printf(TEXT("Run Time: %d"), unixEnd-unixStart));
 
 }
 int AMapGenerator::getMapIndex1D(const int x, const int y, const int z) const{
 	//return sizeX * x + y;
 	return x + sizeX * (y + sizeZ * z);
 }
-//FVector AMapGenerator::getMapIndex3D(const int i) const {
-//	int x = i - sizeX * (y + sizeZ * z);
-//	int y = ((i - x) / sizeX) - (sizeZ * z);
-//	int z = (((i - x) / sizeX) - y) / sizeZ;
-//
-//
-//	return FVector{x,y,z};
-//}
 void AMapGenerator::generateMap(int x, int y, int z, const FVector location, const FRotator rotation, const Tile::Direction d, bool stairs, int depth) {
 	//GetWorld()->GetTimerManager().SetTimer(UnusedHandle, this, &AMapGenerator::TimerEnd, 3.f, false);
 
@@ -92,15 +94,6 @@ void AMapGenerator::generateMap(int x, int y, int z, const FVector location, con
 	bool wallWest = FMath::RandRange(0, 1) == 0;
 	bool wallNorth = FMath::RandRange(0, 1) == 0;
 	bool wallSouth = FMath::RandRange(0, 1) == 0;
-
-	//bool closeBehindEast = FMath::RandRange(0, 1) == 0;
-	//bool closeBehindWest = FMath::RandRange(0, 1) == 0;
-	//bool closeBehindNorth = FMath::RandRange(0, 1) == 0;
-	//bool closeBehindSouth = FMath::RandRange(0, 1) == 0;
-
-
-
-
 	/*
 	- Different tile size (DONE)
 		* spawn 2x2 floor tiles
@@ -186,6 +179,7 @@ void AMapGenerator::generateMap(int x, int y, int z, const FVector location, con
 	
 
 	for (auto& t : tilesToSpawn) {
+
 		room->addTile(t);
 		tileMap.Add(t->getIndex(), t);
 	}
@@ -264,12 +258,12 @@ void AMapGenerator::generateMap(int x, int y, int z, const FVector location, con
 					else if (tilesToSpawn.Num() > 1 && tileIndex == 0) {
 						if (d == Tile::getOppositeDirection(static_cast<Tile::Direction>(i))) {
 							foundTile->deleteWall(Tile::getOppositeDirection(static_cast<Tile::Direction>(i)));
-
+							
 							//Close room behind and add a door to it
 							AActor* door = GetWorld()->SpawnActor<AActor>(wallDoorClass, wallLocation, sideRotation);
 							tilesToSpawn[tileIndex]->addWall(door, Tile::WallType::DOOR, static_cast<Tile::Direction>(i));
 							room->addRoomConnection(otherRoom);
-							
+							otherRoom->addRoomConnection(room);
 						}
 					}
 					
@@ -406,6 +400,7 @@ void AMapGenerator::generateSecretDoors() {
 	for (int i = 0; i < FMath::Min(maxNumberOfSecretDoors, roomList.Num()-1); i++)
 	{
 		roomsWithPotentialSecretDoors.AddUnique(roomList[FMath::RandRange(0, roomList.Num() - 1)]);
+		
 	}
 	for (auto& room : roomsWithPotentialSecretDoors)
 	{
@@ -457,7 +452,7 @@ void AMapGenerator::generateSecretDoors() {
 					Tile* foundTile = *tileMap.Find(getMapIndex1D(tileCoords.X + stepX, tileCoords.Y + stepY, tileCoords.Z));
 					Room* otherRoom = foundTile->getRoom();
 					
-					if (!tile->hasStairs() && !foundTile->hasStairs() && room != otherRoom && !room->roomsAreConnected(otherRoom)) {
+					if (!tile->hasStairs() && !foundTile->hasStairs() && !room->roomsAreConnected(otherRoom)) {
 						
 						//Create Secret Door!
 						tile->deleteWall(wallDir);
